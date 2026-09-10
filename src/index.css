@@ -1,0 +1,168 @@
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;0,6..96,800;0,6..96,900;1,6..96,400;1,6..96,500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-burgundy: #4A0F1B;
+  --color-burgundy-dark: #2E0810;
+  --color-burgundy-light: #6B1A2E;
+  --color-cream: #F7F3EF;
+  --color-silver: #C4C4C4;
+  --color-silver-light: #E8E8E8;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    font-family: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
+    background-color: #ffffff;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: #4A0F1B;
+    color: #F7F3EF;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
+  }
+
+  .font-bodoni {
+    font-family: 'Bodoni Moda', Georgia, 'Times New Roman', serif;
+  }
+
+  .text-burgundy {
+    color: #4A0F1B;
+  }
+
+  .bg-burgundy {
+    background-color: #4A0F1B;
+  }
+
+  .bg-burgundy-dark {
+    background-color: #2E0810;
+  }
+
+  .bg-cream {
+    background-color: #F7F3EF;
+  }
+
+  .border-burgundy {
+    border-color: #4A0F1B;
+  }
+
+  .text-silver {
+    color: #C4C4C4;
+  }
+
+  .bg-silver {
+    background-color: #C4C4C4;
+  }
+
+  .tracking-luxe {
+    letter-spacing: 0.25em;
+  }
+
+  .tracking-wider-luxe {
+    letter-spacing: 0.3em;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.8s ease-out forwards;
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.4s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.5s ease-out forwards;
+  }
+
+  .animate-marquee {
+    animation: marquee 30s linear infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f7f3ef;
+}
+::-webkit-scrollbar-thumb {
+  background: #4A0F1B;
+  border-radius: 0;
+}
+
+/* Hide scrollbar for horizontal scroll areas */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
