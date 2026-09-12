@@ -1,11 +1,27 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+if (!supabaseUrl) {
+  throw new Error("VITE_SUPABASE_URL is missing from your .env file");
+}
+
+if (!supabasePublishableKey) {
+  throw new Error(
+    "VITE_SUPABASE_PUBLISHABLE_KEY is missing from your .env file"
+  );
+}
+
+export const supabase = createClient(
+  supabaseUrl,
+  supabasePublishableKey,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  }
+);
+
+
