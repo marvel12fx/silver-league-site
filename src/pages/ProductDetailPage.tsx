@@ -4,7 +4,7 @@ import { useProduct, useProducts } from '@/lib/hooks';
 import { useStore } from '@/lib/store';
 import { formatPrice } from '@/lib/utils';
 import { ProductCard } from '@/components/ProductCard';
-import { Heart, ShoppingBag, ArrowRight, ArrowLeft, Check, Minus, Plus, Truck, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Heart, ShoppingBag, ArrowRight, ArrowLeft, Check, Minus, Plus, Truck, RotateCcw, ShieldCheck, Play } from 'lucide-react';
 
 export function ProductDetailPage({ slug }: { slug: string }) {
   const { product, loading, error } = useProduct(slug);
@@ -63,6 +63,12 @@ export function ProductDetailPage({ slug }: { slug: string }) {
   const displayImages = selectedColourObj && selectedColourObj.images.length > 0
     ? selectedColourObj.images
     : product.images;
+  const videos = [...(product.product_videos ?? [])].sort((a, b) => a.sort_order - b.sort_order);
+  const media: { kind: 'image' | 'video'; src: string }[] = [
+    ...displayImages.map((src) => ({ kind: 'image' as const, src })),
+    ...videos.map((v) => ({ kind: 'video' as const, src: v.url })),
+  ];
+  const activeMedia = media[selectedImage] ?? media[0] ?? null;
 
   const handleAddToCart = () => {
     if (colours.length > 0 && !selectedColour) {
@@ -106,28 +112,46 @@ export function ProductDetailPage({ slug }: { slug: string }) {
           {/* Images */}
           <div className="flex flex-col-reverse md:flex-row gap-4">
             {/* Thumbnails */}
-            {displayImages.length > 1 && (
+            {media.length > 1 && (
               <div className="flex md:flex-col gap-3 overflow-x-auto md:overflow-visible scrollbar-hide">
-                {displayImages.map((img, i) => (
+                {media.map((item, i) => (
                   <button
-                    key={i}
+                    key={`${item.kind}-${i}`}
                     onClick={() => setSelectedImage(i)}
-                    className={`flex-shrink-0 w-20 h-24 md:w-24 md:h-28 overflow-hidden border-2 transition-colors ${
+                    aria-label={item.kind === 'video' ? `Play video ${i + 1}` : `View image ${i + 1}`}
+                    className={`relative flex-shrink-0 w-20 h-24 md:w-24 md:h-28 overflow-hidden border-2 transition-colors ${
                       selectedImage === i ? 'border-burgundy' : 'border-transparent'
                     }`}
                   >
-                    <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                    {item.kind === 'image' ? (
+                      <img src={item.src} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="w-full h-full flex items-center justify-center bg-burgundy-dark">
+                        <Play size={22} className="text-cream fill-cream" />
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
             )}
-            {/* Main image */}
+            {/* Main media */}
             <div className="flex-1 relative overflow-hidden bg-cream aspect-[3/4]">
-              <img
-                src={displayImages[selectedImage] || displayImages[0] || product.images[0] || ''}
-                alt={product.name}
-                className="w-full h-full object-cover"
-              />
+              {activeMedia?.kind === 'video' ? (
+                <video
+                  key={activeMedia.src}
+                  src={activeMedia.src}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full h-full object-cover bg-black"
+                />
+              ) : (
+                <img
+                  src={activeMedia?.src || ''}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              )}
               {hasDiscount && (
                 <span className="absolute top-4 left-4 bg-burgundy text-cream text-[9px] tracking-luxe uppercase px-3 py-1.5">
                   Sale

@@ -10,6 +10,7 @@ import { CollectionsPage } from '@/pages/CollectionsPage';
 import { CollectionDetailPage } from '@/pages/CollectionDetailPage';
 import { CartPage } from '@/pages/CartPage';
 import { CheckoutPage } from '@/pages/CheckoutPage';
+import { OrderConfirmationPage } from '@/pages/OrderConfirmationPage';
 import { WishlistPage } from '@/pages/WishlistPage';
 import { SearchPage } from '@/pages/SearchPage';
 import { AboutPage } from '@/pages/AboutPage';
@@ -39,6 +40,8 @@ function AppContent() {
     page = <CartPage />;
   } else if (path === '/checkout') {
     page = <CheckoutPage />;
+  } else if (path === '/order-confirmation') {
+    page = <OrderConfirmationPage />;
   } else if (path === '/wishlist') {
     page = <WishlistPage />;
   } else if (path === '/search') {

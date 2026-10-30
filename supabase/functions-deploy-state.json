@@ -1,0 +1,25 @@
+{
+  "projectId": "70520002",
+  "functions": {
+    "create-order": {
+      "hasChanged": false,
+      "hash": "03428a7060e93ad5e1468ec997b8cb0c367f3b3c56b0a2cda90e2b29bd2d97de"
+    },
+    "paystack-webhook": {
+      "hasChanged": false,
+      "hash": "2401d1eacf17cc301304fc4aa0ef7b32ee1d9d66206bf443146b71c42df3f6f6"
+    },
+    "send-order-email": {
+      "hasChanged": false,
+      "hash": "6dfd5d856ced537326b54f474566f30442896367d4199ce17d9f1cc5f7371e0d"
+    },
+    "start-payment": {
+      "hasChanged": false,
+      "hash": "8c2d0d6859acc31be336f17f28488383a8926e20578a09496a6028ace02cc5e2"
+    },
+    "verify-payment": {
+      "hasChanged": false,
+      "hash": "c03f8dfc59cbb678339692bb90a98d19d70ec2f8228b5dfcfe76141d9a91c98e"
+    }
+  }
+}

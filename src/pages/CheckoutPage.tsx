@@ -1,150 +1,58 @@
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { Link } from '@/lib/router';
-import { supabase } from '@/lib/supabase';
-import { formatPrice, generateOrderNumber } from '@/lib/utils';
-import { Check, ArrowLeft, MessageCircle } from 'lucide-react';
+import { useSiteContent } from '@/lib/hooks';
+import { callFunction } from '@/lib/api';
+import { formatPrice } from '@/lib/utils';
+import { quoteDelivery, DeliverySettings, PickupSettings } from '@/lib/delivery';
+import type { CheckoutForm } from '@/lib/types';
+import { ArrowLeft, Lock } from 'lucide-react';
+import { CheckoutInput } from '@/components/checkout/CheckoutFields';
+import { DeliveryChoice, WORLDWIDE_COUNTRIES } from '@/components/checkout/DeliveryChoice';
+import { OrderSummary } from '@/components/checkout/OrderSummary';
 
-type Step = 'information' | 'shipping' | 'payment';
+type Step = 'information' | 'delivery' | 'payment';
 
-const WHATSAPP_NUMBER = '2349010480020';
-const FREE_SHIPPING_THRESHOLD = 500000;
-
-const shippingOptions = [
-  { key: 'lagos', label: 'Lagos Delivery', desc: '1–2 business days', cost: 7000 },
-  { key: 'nationwide', label: 'Nationwide Nigeria', desc: '2–5 business days', cost: 10000 },
-  { key: 'worldwide', label: 'Worldwide Shipping', desc: '1–14 days — variable pricing', cost: 0 },
+const STEPS: { key: Step; label: string }[] = [
+  { key: 'information', label: 'Information' },
+  { key: 'delivery', label: 'Delivery' },
+  { key: 'payment', label: 'Payment' },
 ];
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const INITIAL_FORM: CheckoutForm = {
+  fullName: '',
+  email: '',
+  phone: '',
+  method: 'doorstep',
+  zone: 'lagos',
+  address1: '',
+  address2: '',
+  city: '',
+  state: '',
+  country: 'Nigeria',
+  notes: '',
+};
 
 export function CheckoutPage() {
   const { cart, cartSubtotal, clearCart } = useStore();
+  const { data: deliverySettings, loading: settingsLoading } = useSiteContent('delivery_settings');
+  const { data: pickupSettings } = useSiteContent('pickup');
   const [step, setStep] = useState<Step>('information');
-  const [loading, setLoading] = useState(false);
-  const [orderComplete, setOrderComplete] = useState<string | null>(null);
+  const [form, setForm] = useState<CheckoutForm>(INITIAL_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
-    fullName: '',
-    phone: '',
-    address1: '',
-    address2: '',
-    city: '',
-    state: '',
-    country: 'Nigeria',
-    shippingMethod: 'lagos',
-    notes: '',
-  });
-
-  const selectedShipping = shippingOptions.find((o) => o.key === form.shippingMethod)!;
-  const isWorldwide = form.shippingMethod === 'worldwide';
-  const freeShipping = form.shippingMethod !== 'worldwide' && cartSubtotal >= FREE_SHIPPING_THRESHOLD;
-  const shippingCost = isWorldwide ? 0 : freeShipping ? 0 : selectedShipping.cost;
-  const total = cartSubtotal + shippingCost;
-
-  const updateForm = (key: string, value: string) => {
+  const updateForm = <K extends keyof CheckoutForm>(key: K, value: CheckoutForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSubmit = async () => {
-    setLoading(true);
-    const orderNumber = generateOrderNumber();
-
-    const { data: order } = await supabase
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        customer_name: form.fullName,
-        customer_email: null,
-        customer_phone: form.phone,
-        shipping_address: {
-          line1: form.address1,
-          line2: form.address2,
-          city: form.city,
-          state: form.state,
-          postal_code: '',
-          country: form.country,
-        },
-        shipping_method: form.shippingMethod,
-        shipping_cost: shippingCost,
-        subtotal: cartSubtotal,
-        total,
-        status: 'pending',
-        notes: form.notes,
-      })
-      .select()
-      .single();
-
-    if (order) {
-      const items = cart.map((item) => ({
-        order_id: order.id,
-        product_id: item.product.id,
-        product_name: item.product.name,
-        product_image: item.product.product_colours?.find((c) => c.name === item.colour)?.images?.[0] || item.product.images?.[0] || null,
-        colour: item.colour || null,
-        size: item.size,
-        quantity: item.quantity,
-        price: item.product.price,
-      }));
-      await supabase.from('order_items').insert(items);
-
-      clearCart();
-      setOrderComplete(orderNumber);
-    }
-    setLoading(false);
-  };
-
-  const buildWhatsAppMessage = (orderNum: string) => {
-    let msg = `Hello SILVER LEAGUE, I just placed order ${orderNum}.\n\n`;
-    msg += `Name: ${form.fullName}\n`;
-    msg += `Phone: ${form.phone}\n`;
-    msg += `Address: ${form.address1}, ${form.city}, ${form.state}, ${form.country}\n`;
-    msg += `Shipping: ${selectedShipping.label}\n`;
-    msg += `Subtotal: ${formatPrice(cartSubtotal)}\n`;
-    if (isWorldwide) {
-      msg += `Shipping: Variable (to be confirmed)\n`;
-    } else {
-      msg += `Shipping: ${shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}\n`;
-    }
-    msg += `Total: ${isWorldwide ? 'To be confirmed' : formatPrice(total)}\n`;
-    msg += `\nItems:\n`;
-    cart.forEach((item) => {
-      msg += `- ${item.product.name} (Colour: ${item.colour || 'N/A'}, Size: ${item.size}, Qty: ${item.quantity}) - ${formatPrice(item.product.price * item.quantity)}\n`;
-    });
-    return encodeURIComponent(msg);
-  };
-
-  if (orderComplete) {
-    const waLink = `https://wa.me/${WHATSAPP_NUMBER}?text=${buildWhatsAppMessage(orderComplete)}`;
-    return (
-      <div className="bg-white min-h-screen flex flex-col items-center justify-center px-4 py-32">
-        <div className="w-16 h-16 bg-burgundy text-cream rounded-full flex items-center justify-center mb-8 animate-scale-in">
-          <Check size={32} />
-        </div>
-        <p className="text-[10px] tracking-wider-luxe uppercase text-silver-dark mb-4">Order Received</p>
-        <h1 className="font-display text-4xl md:text-5xl text-burgundy-dark mb-4 text-center">Thank You for Your Order</h1>
-        <p className="text-burgundy-dark/70 text-sm mb-2 text-center max-w-md">
-          Your order has been received and is being prepared with care.
-        </p>
-        <p className="font-display text-xl text-burgundy mb-8">Order {orderComplete}</p>
-        <div className="bg-cream p-6 max-w-md w-full mb-8 text-sm text-burgundy-dark/70 text-center">
-          <p className="mb-4">To complete your order, please contact us on WhatsApp to arrange payment and confirm delivery.</p>
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 bg-burgundy text-cream px-8 py-4 text-xs tracking-luxe uppercase hover:bg-burgundy-dark transition-colors"
-          >
-            <MessageCircle size={16} /> Contact Us on WhatsApp
-          </a>
-        </div>
-        <Link
-          to="/shop"
-          className="inline-flex items-center gap-3 border border-burgundy text-burgundy px-8 py-4 text-xs tracking-luxe uppercase hover:bg-burgundy hover:text-cream transition-colors"
-        >
-          Continue Shopping
-        </Link>
-      </div>
-    );
-  }
+  const informationValid = form.fullName.trim().length > 1 && EMAIL_PATTERN.test(form.email.trim()) && form.phone.trim().length >= 7;
+  const deliveryValid = form.method === 'pickup' || (
+    form.address1.trim() !== '' && form.city.trim() !== '' && form.state.trim() !== '' &&
+    (form.zone !== 'worldwide' || WORLDWIDE_COUNTRIES.includes(form.country))
+  );
 
   if (cart.length === 0) {
     return (
@@ -157,11 +65,84 @@ export function CheckoutPage() {
     );
   }
 
-  const steps: { key: Step; label: string }[] = [
-    { key: 'information', label: 'Information' },
-    { key: 'shipping', label: 'Shipping' },
-    { key: 'payment', label: 'Payment' },
-  ];
+  if (settingsLoading) {
+    return (
+      <div className="bg-white min-h-screen flex items-center justify-center px-4 py-32">
+        <p className="text-xs tracking-luxe uppercase text-silver-dark">Loading checkout...</p>
+      </div>
+    );
+  }
+
+  if (!deliverySettings) {
+    return (
+      <div className="bg-white min-h-screen flex flex-col items-center justify-center px-4 py-32 text-center">
+        <p className="font-display text-3xl text-burgundy-dark mb-4">Checkout is unavailable right now</p>
+        <p className="text-sm text-burgundy-dark/70 mb-8">Delivery options are being updated. Please try again shortly.</p>
+        <Link to="/cart" className="text-burgundy text-xs tracking-luxe uppercase border-b border-burgundy pb-1">
+          Back to Bag
+        </Link>
+      </div>
+    );
+  }
+
+  const settings = deliverySettings as DeliverySettings;
+  const pickup = (pickupSettings ?? null) as PickupSettings | null;
+  const deliveryFee = form.method === 'pickup' ? 0 : quoteDelivery(settings, 'doorstep', form.zone, cartSubtotal);
+  const amountDueNow = cartSubtotal + (deliveryFee ?? 0);
+  const stepIndex = STEPS.findIndex((s) => s.key === step);
+
+  const handlePay = async () => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const created = await callFunction<{ order_number: string; paystack_reference: string }>('create-order', {
+        customer: { name: form.fullName.trim(), email: form.email.trim(), phone: form.phone.trim() },
+        delivery: {
+          method: form.method,
+          zone: form.method === 'doorstep' ? form.zone : null,
+          address: form.method === 'doorstep'
+            ? {
+                line1: form.address1.trim(),
+                line2: form.address2.trim(),
+                city: form.city.trim(),
+                state: form.state.trim(),
+                country: form.zone === 'worldwide' ? form.country : 'Nigeria',
+              }
+            : null,
+        },
+        items: cart.map((item) => ({
+          product_id: item.product.id,
+          size: item.size,
+          colour: item.colour,
+          quantity: item.quantity,
+        })),
+        notes: form.notes.trim(),
+      });
+
+      if (typeof created.order_number !== 'string' || typeof created.paystack_reference !== 'string') {
+        throw new Error('Unexpected response from the server. Please try again.');
+      }
+
+      let authorizationUrl: string;
+      try {
+        const started = await callFunction<{ authorization_url: string }>('start-payment', {
+          order_number: created.order_number,
+          reference: created.paystack_reference,
+          callback_url: `${window.location.origin}${window.location.pathname}`,
+        });
+        authorizationUrl = started.authorization_url;
+      } catch (paymentErr) {
+        const message = paymentErr instanceof Error ? paymentErr.message : 'Payment could not be started.';
+        throw new Error(`Your order ${created.order_number} was saved, but payment could not start: ${message} Please contact us on WhatsApp to complete payment.`);
+      }
+
+      clearCart();
+      window.location.href = authorizationUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="bg-white min-h-screen">
@@ -174,266 +155,131 @@ export function CheckoutPage() {
 
       <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-10">
         <div className="grid lg:grid-cols-2 gap-12">
-          {/* Form */}
           <div>
-            {/* Step indicator */}
-            <div className="flex items-center gap-2 mb-8">
-              {steps.map((s, i) => (
+            <div className="flex items-center gap-2 mb-8 flex-wrap">
+              {STEPS.map((s, i) => (
                 <div key={s.key} className="flex items-center gap-2">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs ${
-                    step === s.key ? 'bg-burgundy text-cream' :
-                    steps.findIndex(x => x.key === step) > i ? 'bg-burgundy text-cream' : 'bg-gray-200 text-gray-500'
+                    i <= stepIndex ? 'bg-burgundy text-cream' : 'bg-gray-200 text-gray-500'
                   }`}>
-                    {steps.findIndex(x => x.key === step) > i ? <Check size={14} /> : i + 1}
+                    {i + 1}
                   </div>
                   <span className={`text-[10px] tracking-luxe uppercase ${step === s.key ? 'text-burgundy' : 'text-silver-dark'}`}>
                     {s.label}
                   </span>
-                  {i < steps.length - 1 && <div className="w-8 h-px bg-gray-200" />}
+                  {i < STEPS.length - 1 && <div className="w-8 h-px bg-gray-200" />}
                 </div>
               ))}
             </div>
 
             {step === 'information' && (
               <div className="space-y-4 animate-fade-in">
-                <h2 className="font-display text-2xl text-burgundy-dark mb-4">Contact & Delivery Information</h2>
-                <Input label="Full Name" value={form.fullName} onChange={(v) => updateForm('fullName', v)} required />
-                <Input label="Phone Number" value={form.phone} onChange={(v) => updateForm('phone', v)} type="tel" required placeholder="e.g. 0801 234 5678" />
-                <Input label="Address Line 1" value={form.address1} onChange={(v) => updateForm('address1', v)} required />
-                <Input label="Address Line 2 (Optional)" value={form.address2} onChange={(v) => updateForm('address2', v)} />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="City" value={form.city} onChange={(v) => updateForm('city', v)} required />
-                  <Input label="State" value={form.state} onChange={(v) => updateForm('state', v)} required />
-                </div>
-                <div>
-                  <label className="block text-[10px] tracking-luxe uppercase text-silver-dark mb-2">Country</label>
-                  <select
-                    value={form.country}
-                    onChange={(e) => updateForm('country', e.target.value)}
-                    className="w-full border border-gray-300 px-4 py-3 text-sm text-burgundy-dark outline-none focus:border-burgundy transition-colors bg-white"
-                  >
-                    <option>Nigeria</option>
-                    <option>United States</option>
-                    <option>United Kingdom</option>
-                    <option>Canada</option>
-                    <option>United Arab Emirates</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-
+                <h2 className="font-display text-2xl text-burgundy-dark mb-4">Contact Information</h2>
+                <CheckoutInput label="Full Name" value={form.fullName} onChange={(v) => updateForm('fullName', v)} required autoComplete="name" />
+                <CheckoutInput label="Email Address" type="email" value={form.email} onChange={(v) => updateForm('email', v)} required autoComplete="email" placeholder="You will receive your confirmation here" />
+                <CheckoutInput label="Phone Number" value={form.phone} onChange={(v) => updateForm('phone', v)} type="tel" required autoComplete="tel" placeholder="e.g. 0801 234 5678" />
                 <button
-                  onClick={() => setStep('shipping')}
-                  disabled={!form.fullName || !form.phone || !form.address1 || !form.city || !form.state}
+                  type="button"
+                  onClick={() => setStep('delivery')}
+                  disabled={!informationValid}
                   className="w-full bg-burgundy text-cream py-4 text-xs tracking-luxe uppercase hover:bg-burgundy-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed mt-4"
                 >
-                  Continue to Shipping
+                  Continue to Delivery
                 </button>
               </div>
             )}
 
-            {step === 'shipping' && (
-              <div className="space-y-4 animate-fade-in">
-                <h2 className="font-display text-2xl text-burgundy-dark mb-4">Shipping Method</h2>
-                {shippingOptions.map((opt) => {
-                  const isFree = opt.key !== 'worldwide' && cartSubtotal >= FREE_SHIPPING_THRESHOLD;
-                  const displayCost = opt.key === 'worldwide' ? null : isFree ? 0 : opt.cost;
-                  return (
-                    <ShippingOption
-                      key={opt.key}
-                      name={opt.label}
-                      desc={opt.desc}
-                      cost={displayCost}
-                      selected={form.shippingMethod === opt.key}
-                      onSelect={() => updateForm('shippingMethod', opt.key)}
-                    />
-                  );
-                })}
-
-                {form.shippingMethod !== 'worldwide' && cartSubtotal < FREE_SHIPPING_THRESHOLD && (
-                  <p className="text-xs text-burgundy-light bg-cream p-3">
-                    Add {formatPrice(FREE_SHIPPING_THRESHOLD - cartSubtotal)} more to your order for free delivery within Nigeria.
-                  </p>
-                )}
-
-                <div>
-                  <label className="block text-[10px] tracking-luxe uppercase text-silver-dark mb-2">Order Notes (Optional)</label>
-                  <textarea
-                    value={form.notes}
-                    onChange={(e) => updateForm('notes', e.target.value)}
-                    rows={3}
-                    className="w-full border border-gray-300 px-4 py-3 text-sm text-burgundy-dark outline-none focus:border-burgundy transition-colors resize-none"
-                    placeholder="Special delivery instructions..."
-                  />
-                </div>
-
+            {step === 'delivery' && (
+              <div className="space-y-6 animate-fade-in">
+                <h2 className="font-display text-2xl text-burgundy-dark">Delivery Method</h2>
+                <DeliveryChoice
+                  form={form}
+                  onChange={updateForm}
+                  settings={settings}
+                  pickup={pickup}
+                  subtotal={cartSubtotal}
+                />
                 <div className="flex gap-3 mt-4">
                   <button
+                    type="button"
                     onClick={() => setStep('information')}
                     className="flex-1 border border-burgundy text-burgundy py-4 text-xs tracking-luxe uppercase hover:bg-burgundy hover:text-cream transition-colors"
                   >
                     Back
                   </button>
                   <button
+                    type="button"
                     onClick={() => setStep('payment')}
-                    className="flex-1 bg-burgundy text-cream py-4 text-xs tracking-luxe uppercase hover:bg-burgundy-dark transition-colors"
+                    disabled={!deliveryValid}
+                    className="flex-1 bg-burgundy text-cream py-4 text-xs tracking-luxe uppercase hover:bg-burgundy-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Continue to Payment
+                    Review & Pay
                   </button>
                 </div>
               </div>
             )}
 
             {step === 'payment' && (
-              <div className="space-y-4 animate-fade-in">
-                <h2 className="font-display text-2xl text-burgundy-dark mb-2">Payment</h2>
+              <div className="space-y-6 animate-fade-in">
+                <h2 className="font-display text-2xl text-burgundy-dark">Secure Payment</h2>
 
-                <div className="border-2 border-burgundy/20 p-6 text-center bg-cream/50">
-                  <MessageCircle size={32} className="text-burgundy mx-auto mb-4" />
-                  <p className="text-sm text-burgundy-dark/80 mb-2 font-medium">
-                    Complete your order via WhatsApp
+                <div className="border border-burgundy/20 p-6 bg-cream/50 space-y-3 text-sm text-burgundy-dark/80">
+                  <p className="font-medium text-burgundy-dark">{form.fullName}</p>
+                  <p>{form.email} · {form.phone}</p>
+                  <p>
+                    {form.method === 'pickup'
+                      ? `Self-pickup: ${pickup?.location_name || 'SILVER LEAGUE Park Location'}`
+                      : `Doorstep delivery: ${form.address1}${form.address2 ? `, ${form.address2}` : ''}, ${form.city}, ${form.state}, ${form.zone === 'worldwide' ? form.country : 'Nigeria'}`}
                   </p>
-                  <p className="text-xs text-silver-dark mb-4">
-                    After placing your order, you will be redirected to WhatsApp to arrange payment and confirm delivery details with the SILVER LEAGUE team.
-                  </p>
-                  <div className="text-xs text-silver-dark border-t border-burgundy/10 pt-3 mt-3">
-                    {isWorldwide ? (
-                      <p>Shipping cost for worldwide orders will be confirmed via WhatsApp based on your location.</p>
-                    ) : (
-                      <p>Payment options will be discussed with you on WhatsApp after your order is placed.</p>
-                    )}
-                  </div>
+                  {form.zone === 'worldwide' && form.method === 'doorstep' && (
+                    <p className="text-xs text-silver-dark">
+                      Worldwide shipping is confirmed by our team after your order. Your card payment covers your items and any confirmed delivery fee.
+                    </p>
+                  )}
                 </div>
+
+                <div className="border border-burgundy/20 p-6 text-sm text-burgundy-dark/80">
+                  <p className="flex items-center gap-2 font-medium text-burgundy-dark mb-2">
+                    <Lock size={14} /> Paystack secure checkout
+                  </p>
+                  <p className="text-xs text-silver-dark">
+                    You will be taken to Paystack to pay securely by card, bank transfer or other methods enabled for SILVER LEAGUE. Your order is confirmed only after Paystack verifies your payment.
+                  </p>
+                </div>
+
+                {error && (
+                  <p role="alert" className="text-sm text-red-800 bg-red-50 border border-red-200 p-4">
+                    {error}
+                  </p>
+                )}
 
                 <div className="flex gap-3 mt-4">
                   <button
-                    onClick={() => setStep('shipping')}
-                    className="flex-1 border border-burgundy text-burgundy py-4 text-xs tracking-luxe uppercase hover:bg-burgundy hover:text-cream transition-colors"
+                    type="button"
+                    onClick={() => setStep('delivery')}
+                    disabled={submitting}
+                    className="flex-1 border border-burgundy text-burgundy py-4 text-xs tracking-luxe uppercase hover:bg-burgundy hover:text-cream transition-colors disabled:opacity-50"
                   >
                     Back
                   </button>
                   <button
-                    onClick={handleSubmit}
-                    disabled={loading}
+                    type="button"
+                    onClick={handlePay}
+                    disabled={submitting}
                     className="flex-1 bg-burgundy text-cream py-4 text-xs tracking-luxe uppercase hover:bg-burgundy-dark transition-colors disabled:opacity-50"
                   >
-                    {loading ? 'Placing Order...' : 'Place Order'}
+                    {submitting ? 'Starting Payment...' : `Pay ${formatPrice(amountDueNow)}`}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Summary */}
           <div>
-            <div className="bg-cream p-6 md:p-8 sticky top-28">
-              <h2 className="font-display text-2xl text-burgundy-dark mb-6 pb-4 border-b border-burgundy/10">Your Order</h2>
-              <div className="space-y-4 mb-6 max-h-64 overflow-y-auto">
-                {cart.map((item, i) => (
-                  <div key={`${item.product.id}-${item.colour}-${item.size}-${i}`} className="flex gap-3">
-                    <div className="w-16 h-20 bg-white flex-shrink-0 overflow-hidden relative">
-                      <img src={item.product.product_colours?.find((c) => c.name === item.colour)?.images?.[0] || item.product.images?.[0] || ''} alt={item.product.name} className="w-full h-full object-cover" />
-                      <span className="absolute -top-1 -right-1 bg-burgundy text-cream text-[10px] w-5 h-5 rounded-full flex items-center justify-center">
-                        {item.quantity}
-                      </span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-display text-sm text-burgundy-dark truncate">{item.product.name}</p>
-                      <p className="text-xs text-silver-dark">{item.colour && <>Colour: {item.colour} · </>}Size: {item.size}</p>
-                      <p className="text-sm text-burgundy mt-1">{formatPrice(item.product.price * item.quantity)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-3 pt-4 border-t border-burgundy/10">
-                <div className="flex justify-between text-sm text-burgundy-dark/70">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(cartSubtotal)}</span>
-                </div>
-                <div className="flex justify-between text-sm text-burgundy-dark/70">
-                  <span>Shipping</span>
-                  <span>
-                    {isWorldwide ? 'To be confirmed' : shippingCost === 0 ? 'Free' : formatPrice(shippingCost)}
-                  </span>
-                </div>
-                <div className="flex justify-between font-display text-xl text-burgundy-dark pt-3 border-t border-burgundy/10">
-                  <span>Total</span>
-                  <span>{isWorldwide ? 'To be confirmed' : formatPrice(total)}</span>
-                </div>
-              </div>
-            </div>
+            <OrderSummary cart={cart} subtotal={cartSubtotal} deliveryFee={deliveryFee} total={amountDueNow} />
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  required,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  required?: boolean;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="block text-[10px] tracking-luxe uppercase text-silver-dark mb-2">
-        {label}{required && ' *'}
-      </label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        placeholder={placeholder}
-        className="w-full border border-gray-300 px-4 py-3 text-sm text-burgundy-dark outline-none focus:border-burgundy transition-colors"
-      />
-    </div>
-  );
-}
-
-function ShippingOption({
-  name,
-  desc,
-  cost,
-  selected,
-  onSelect,
-}: {
-  name: string;
-  desc: string;
-  cost: number | null;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  return (
-    <button
-      onClick={onSelect}
-      className={`w-full flex items-center justify-between p-4 border-2 transition-colors text-left ${
-        selected ? 'border-burgundy bg-cream' : 'border-gray-200 hover:border-gray-300'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-          selected ? 'border-burgundy' : 'border-gray-300'
-        }`}>
-          {selected && <div className="w-2.5 h-2.5 rounded-full bg-burgundy" />}
-        </div>
-        <div>
-          <p className="text-sm text-burgundy-dark font-medium">{name}</p>
-          <p className="text-xs text-silver-dark">{desc}</p>
-        </div>
-      </div>
-      <p className="text-sm text-burgundy-dark">
-        {cost === null ? 'Variable' : cost === 0 ? 'Free' : formatPrice(cost)}
-      </p>
-    </button>
   );
 }

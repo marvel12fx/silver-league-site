@@ -51,6 +51,16 @@ export interface Product {
   collections?: Collection;
   product_sizes?: ProductSize[];
   product_colours?: ProductColour[];
+  product_videos?: ProductVideo[];
+}
+
+export interface ProductVideo {
+  id: string;
+  product_id: string;
+  url: string;
+  storage_path: string;
+  sort_order: number;
+  created_at: string;
 }
 
 export interface CartItem {
@@ -73,11 +83,15 @@ export interface OrderItem {
   created_at: string;
 }
 
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'abandoned';
+export type DeliveryStatus = 'not_started' | 'preparing' | 'ready_for_pickup' | 'out_for_delivery' | 'delivered' | 'picked_up';
+export type OrderStatus = 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+
 export interface Order {
   id: string;
   order_number: string;
   customer_name: string;
-  customer_email: string;
+  customer_email: string | null;
   customer_phone: string | null;
   shipping_address: {
     line1: string;
@@ -91,10 +105,47 @@ export interface Order {
   shipping_cost: number;
   subtotal: number;
   total: number;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  status: OrderStatus;
   notes: string | null;
+  payment_status: PaymentStatus;
+  paystack_reference: string | null;
+  payment_amount: number | null;
+  paid_at: string | null;
+  delivery_method: 'pickup' | 'doorstep';
+  delivery_zone: 'lagos' | 'nigeria' | 'worldwide' | null;
+  delivery_fee: number;
+  delivery_status: DeliveryStatus;
+  pickup_location: string | null;
   created_at: string;
   order_items?: OrderItem[];
+}
+
+export interface OrderSummary {
+  order_number: string;
+  payment_status: PaymentStatus;
+  paid_at: string | null;
+  subtotal: number;
+  delivery_fee: number;
+  total: number;
+  delivery_method: 'pickup' | 'doorstep';
+  delivery_zone: 'lagos' | 'nigeria' | 'worldwide' | null;
+  delivery_status: DeliveryStatus;
+  pickup_location: string | null;
+  order_items: Pick<OrderItem, 'product_name' | 'colour' | 'size' | 'quantity' | 'price'>[];
+}
+
+export interface CheckoutForm {
+  fullName: string;
+  email: string;
+  phone: string;
+  method: 'pickup' | 'doorstep';
+  zone: 'lagos' | 'nigeria' | 'worldwide';
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  country: string;
+  notes: string;
 }
 
 export interface SiteContent {

@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { supabase } from './supabase';
 import { Product, Collection, Category, Service, Testimonial, PortfolioItem } from './types';
 
+export const PRODUCT_SELECT = '*, categories(*), collections(*), product_sizes(*), product_colours(*), product_videos(*)';
+
 export function useProducts(filters?: {
   category?: string;
   collection?: string;
@@ -20,7 +22,7 @@ export function useProducts(filters?: {
 
     let query = supabase
       .from('products')
-      .select('*, categories(*), collections(*), product_sizes(*), product_colours(*)');
+      .select(PRODUCT_SELECT);
 
     if (filters?.category) {
       query = query.eq('categories.slug', filters.category);
@@ -81,7 +83,7 @@ export function useProduct(slug: string) {
       setLoading(true);
       const { data, error: err } = await supabase
         .from('products')
-        .select('*, categories(*), collections(*), product_sizes(*), product_colours(*)')
+        .select(PRODUCT_SELECT)
         .eq('slug', slug)
         .maybeSingle();
 

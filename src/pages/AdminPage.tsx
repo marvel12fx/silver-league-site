@@ -2,9 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { LogoMark } from '@/components/Logo';
 import { formatPrice } from '@/lib/utils';
-import { Lock, AlertCircle, LogOut, LayoutDashboard, Package, ShoppingBag, FolderOpen, Menu, X, Upload, Plus, Trash2, MessageCircle, TrendingUp, Clock, CheckCircle, Home, Info, Sparkles, Quote, Phone, Briefcase } from 'lucide-react';
+import { Lock, AlertCircle, LogOut, LayoutDashboard, Package, ShoppingBag, FolderOpen, Menu, X, Upload, Plus, Trash2, MessageCircle, TrendingUp, Clock, CheckCircle, Home, Info, Sparkles, Quote, Phone, Briefcase, Truck } from 'lucide-react';
 import { Link } from '@/lib/router';
 import { AdminHomepage, AdminAbout, AdminServices, AdminTestimonials, AdminContact, AdminPortfolio } from './AdminContent';
+import { ProductVideoManager } from '@/components/admin/ProductVideoManager';
+import { AdminOrders } from './AdminOrders';
+import { OrderStatusBadge } from '@/components/admin/OrderDetail';
+import { AdminDeliverySettings } from './AdminDeliverySettings';
+import { PRODUCT_SELECT } from '@/lib/hooks';
 
 const WHATSAPP_NUMBER = '2349010480020';
 const ADMIN_EMAIL = 'marveldital@gmail.com';
@@ -173,6 +178,7 @@ export function AdminPage() {
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Overview' },
     { key: 'products', label: 'Products', icon: Package, desc: 'Manage your items' },
     { key: 'orders', label: 'Orders', icon: ShoppingBag, desc: 'View and update orders' },
+    { key: 'delivery', label: 'Delivery & Pickup', icon: Truck, desc: 'Fees, estimates and pickup details' },
     { key: 'collections', label: 'Collections', icon: FolderOpen, desc: 'Organise your collections' },
     { key: 'homepage', label: 'Homepage', icon: Home, desc: 'Edit homepage hero' },
     { key: 'about', label: 'About', icon: Info, desc: 'Edit brand story' },
@@ -257,6 +263,7 @@ export function AdminPage() {
           {activeTab === 'dashboard' && <AdminDashboard />}
           {activeTab === 'products' && <AdminProducts />}
           {activeTab === 'orders' && <AdminOrders />}
+          {activeTab === 'delivery' && <AdminDeliverySettings />}
           {activeTab === 'collections' && <AdminCollections />}
           {activeTab === 'homepage' && <AdminHomepage />}
           {activeTab === 'about' && <AdminAbout />}
@@ -361,7 +368,7 @@ function AdminProducts() {
 
   const fetchData = async () => {
     const [{ data: prods }, { data: cats }, { data: cols }] = await Promise.all([
-      supabase.from('products').select('*, categories(*), collections(*), product_sizes(*), product_colours(*)').order('created_at', { ascending: false }),
+      supabase.from('products').select(PRODUCT_SELECT).order('created_at', { ascending: false }),
       supabase.from('categories').select('*').order('name'),
       supabase.from('collections').select('*').order('name'),
     ]);
@@ -771,6 +778,8 @@ function ProductForm({ product, categories, collections, onClose, onSave }: {
           )}
         </div>
 
+        {product?.id && <ProductVideoManager productId={product.id} />}
+
         {/* Colours */}
         <div>
           <label className="block text-[10px] tracking-luxe uppercase text-silver-dark mb-2">Colours & Photos</label>
@@ -942,178 +951,6 @@ function ProductForm({ product, categories, collections, onClose, onSave }: {
           </button>
         </div>
       </div>
-    </div>
-  );
-}
-
-// === Orders ===
-function AdminOrders() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
-
-  const fetchOrders = async () => {
-    const { data } = await supabase
-      .from('orders')
-      .select('*, order_items(*)')
-      .order('created_at', { ascending: false });
-    setOrders(data || []);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchOrders(); }, []);
-
-  const updateStatus = async (id: string, status: string) => {
-    await supabase.from('orders').update({ status }).eq('id', id);
-    fetchOrders();
-    if (selectedOrder?.id === id) {
-      setSelectedOrder({ ...selectedOrder, status });
-    }
-  };
-
-  const contactCustomerWhatsApp = (order: any) => {
-    const msg = `Hello ${order.customer_name}, this is SILVER LEAGUE regarding your order ${order.order_number}.`;
-    window.open(`https://wa.me/${order.customer_phone?.replace(/[^0-9]/g, '') || WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
-  };
-
-  if (selectedOrder) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <button onClick={() => setSelectedOrder(null)} className="text-sm text-burgundy hover:underline mb-6">
-          ← Back to Orders
-        </button>
-        <div className="bg-white border border-gray-100 p-6 md:p-8">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <p className="font-display text-2xl text-burgundy-dark">{selectedOrder.order_number}</p>
-              <p className="text-sm text-silver-dark">{new Date(selectedOrder.created_at).toLocaleDateString()}</p>
-            </div>
-            <OrderStatusBadge status={selectedOrder.status} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 mb-6 pb-6 border-b border-gray-100">
-            <div>
-              <p className="text-[10px] tracking-luxe uppercase text-silver-dark mb-2">Customer</p>
-              <p className="text-sm text-burgundy-dark">{selectedOrder.customer_name}</p>
-              {selectedOrder.customer_phone && <p className="text-sm text-silver-dark">{selectedOrder.customer_phone}</p>}
-              <button
-                onClick={() => contactCustomerWhatsApp(selectedOrder)}
-                className="inline-flex items-center gap-2 text-xs text-burgundy hover:underline mt-2"
-              >
-                <MessageCircle size={14} /> Contact on WhatsApp
-              </button>
-            </div>
-            <div>
-              <p className="text-[10px] tracking-luxe uppercase text-silver-dark mb-2">Delivery Address</p>
-              <p className="text-sm text-burgundy-dark">{selectedOrder.shipping_address?.line1}</p>
-              {selectedOrder.shipping_address?.line2 && <p className="text-sm text-silver-dark">{selectedOrder.shipping_address.line2}</p>}
-              <p className="text-sm text-silver-dark">
-                {selectedOrder.shipping_address?.city}, {selectedOrder.shipping_address?.state}
-              </p>
-              <p className="text-sm text-silver-dark">{selectedOrder.shipping_address?.country}</p>
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <p className="text-[10px] tracking-luxe uppercase text-silver-dark mb-3">Items</p>
-            <div className="space-y-3">
-              {(selectedOrder.order_items || []).map((item: any) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <div className="flex gap-3">
-                    {item.product_image && <img src={item.product_image} alt="" className="w-12 h-16 object-cover bg-cream" />}
-                    <div>
-                      <p className="text-burgundy-dark">{item.product_name}</p>
-                      <p className="text-xs text-silver-dark">{item.colour && <>Colour: {item.colour} · </>}Size: {item.size} · Qty: {item.quantity}</p>
-                    </div>
-                  </div>
-                  <p className="text-burgundy-dark">{formatPrice(Number(item.price * item.quantity))}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2 pt-4 border-t border-gray-100 mb-6">
-            <div className="flex justify-between text-sm text-silver-dark">
-              <span>Subtotal</span><span>{formatPrice(Number(selectedOrder.subtotal))}</span>
-            </div>
-            <div className="flex justify-between text-sm text-silver-dark">
-              <span>Shipping</span><span>{formatPrice(Number(selectedOrder.shipping_cost))}</span>
-            </div>
-            <div className="flex justify-between font-display text-lg text-burgundy-dark">
-              <span>Total</span><span>{formatPrice(Number(selectedOrder.total))}</span>
-            </div>
-          </div>
-
-          {selectedOrder.notes && (
-            <div className="mb-6 p-4 bg-cream">
-              <p className="text-[10px] tracking-luxe uppercase text-silver-dark mb-1">Order Notes</p>
-              <p className="text-sm text-burgundy-dark">{selectedOrder.notes}</p>
-            </div>
-          )}
-
-          <div>
-            <p className="text-[10px] tracking-luxe uppercase text-silver-dark mb-3">Update Order Status</p>
-            <div className="flex flex-wrap gap-2">
-              {['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'].map((status) => (
-                <button
-                  key={status}
-                  onClick={() => updateStatus(selectedOrder.id, status)}
-                  className={`px-4 py-2 text-xs tracking-luxe uppercase border transition-colors ${
-                    selectedOrder.status === status
-                      ? 'bg-burgundy text-cream border-burgundy'
-                      : 'border-gray-300 text-burgundy-dark hover:border-burgundy'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <p className="text-sm text-silver-dark mb-6">{orders.length} orders</p>
-      {loading ? (
-        <p className="text-silver-dark text-sm">Loading...</p>
-      ) : orders.length === 0 ? (
-        <div className="bg-white border border-gray-100 p-12 text-center">
-          <ShoppingBag size={32} className="text-silver mx-auto mb-4" />
-          <p className="text-silver-dark text-sm">No orders yet. When customers place orders, they will appear here.</p>
-        </div>
-      ) : (
-        <div className="bg-white border border-gray-100 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-cream text-[10px] tracking-luxe uppercase text-silver-dark">
-              <tr>
-                <th className="text-left p-4">Order</th>
-                <th className="text-left p-4 hidden md:table-cell">Customer</th>
-                <th className="text-left p-4 hidden lg:table-cell">Date</th>
-                <th className="text-right p-4">Total</th>
-                <th className="text-center p-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {orders.map((o) => (
-                <tr
-                  key={o.id}
-                  onClick={() => setSelectedOrder(o)}
-                  className="hover:bg-cream/50 transition-colors cursor-pointer"
-                >
-                  <td className="p-4 font-display text-burgundy-dark">{o.order_number}</td>
-                  <td className="p-4 hidden md:table-cell text-silver-dark">{o.customer_name}</td>
-                  <td className="p-4 hidden lg:table-cell text-silver-dark">{new Date(o.created_at).toLocaleDateString()}</td>
-                  <td className="p-4 text-right text-burgundy-dark">{formatPrice(Number(o.total))}</td>
-                  <td className="p-4 text-center"><OrderStatusBadge status={o.status} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
@@ -1323,22 +1160,6 @@ function CollectionForm({ collection, onClose, onSave }: {
         </div>
       </div>
     </div>
-  );
-}
-
-// === Shared UI ===
-function OrderStatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    confirmed: 'bg-blue-100 text-blue-800',
-    shipped: 'bg-purple-100 text-purple-800',
-    delivered: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  };
-  return (
-    <span className={`text-[9px] tracking-luxe uppercase px-2 py-1 ${colors[status] || 'bg-gray-100 text-gray-700'}`}>
-      {status}
-    </span>
   );
 }
 
