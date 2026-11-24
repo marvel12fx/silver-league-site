@@ -20,6 +20,10 @@
     "verify-payment": {
       "hasChanged": false,
       "hash": "c03f8dfc59cbb678339692bb90a98d19d70ec2f8228b5dfcfe76141d9a91c98e"
+    },
+    "get-public-config": {
+      "hasChanged": false,
+      "hash": "d409fe626d360924051066dbd4b9673481b64e623e3cff4e86c624d090806f21"
     }
   }
 }
