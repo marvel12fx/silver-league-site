@@ -174,9 +174,23 @@ function adminEmail(order: OrderRow, kind: "placed" | "paid"): { subject: string
   };
 }
 
+async function getSecret(name: string): Promise<string | null> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceKey) return null;
+  const { data } = await createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+    .from("app_secrets")
+    .select("value")
+    .eq("name", name)
+    .maybeSingle();
+  return (data as { value: string } | null)?.value ?? null;
+}
+
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
-  const apiKey = Deno.env.get("RESEND_API_KEY");
-  const from = Deno.env.get("RESEND_FROM_EMAIL");
+  const apiKey = Deno.env.get("RESEND_API_KEY") ?? (await getSecret("RESEND_API_KEY"));
+  const from = Deno.env.get("RESEND_FROM_EMAIL") ?? (await getSecret("RESEND_FROM_EMAIL"));
   if (!apiKey || !from) {
     throw new Error("Email service is not connected (RESEND_API_KEY / RESEND_FROM_EMAIL missing)");
   }

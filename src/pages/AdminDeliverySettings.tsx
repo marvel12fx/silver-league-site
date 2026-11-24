@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { DeliverySettings, PickupSettings } from '@/lib/delivery';
 import { Save } from 'lucide-react';
+import { AdminEmailKey } from '@/components/admin/AdminEmailKey';
 
 const inputClass = 'w-full border border-gray-300 px-4 py-3 text-sm text-burgundy-dark outline-none focus:border-burgundy bg-white';
 const labelClass = 'block text-[10px] tracking-luxe uppercase text-silver-dark mb-2';
@@ -76,6 +77,8 @@ export function AdminDeliverySettings() {
       {message && (
         <p className={`text-sm ${message.kind === 'ok' ? 'text-green-800' : 'text-red-700'}`}>{message.text}</p>
       )}
+
+      <AdminEmailKey />
 
       <section className="bg-white border border-gray-100 p-6 md:p-8 space-y-6">
         <div>

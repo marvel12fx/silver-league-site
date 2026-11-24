@@ -3,7 +3,7 @@
   "functions": {
     "create-order": {
       "hasChanged": false,
-      "hash": "03428a7060e93ad5e1468ec997b8cb0c367f3b3c56b0a2cda90e2b29bd2d97de"
+      "hash": "f4f45bc23b59e2a05ad6ae374342ff4639d659e488a66557335a692c7931644a"
     },
     "paystack-webhook": {
       "hasChanged": false,
@@ -11,7 +11,7 @@
     },
     "send-order-email": {
       "hasChanged": false,
-      "hash": "6dfd5d856ced537326b54f474566f30442896367d4199ce17d9f1cc5f7371e0d"
+      "hash": "ca7ff5c80583cdfe589da30323ea63c741dd5aa2b50668f27db358128e22af66"
     },
     "start-payment": {
       "hasChanged": false,
